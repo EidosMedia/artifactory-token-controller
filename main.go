@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -226,7 +228,14 @@ func handleModified(endpoints *v1.Endpoints) {
 	for _, subsets := range endpoints.Subsets {
 		if subsets.Addresses != nil && len(subsets.Addresses) > 0 {
 			//found ready artifactory address
-			url := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", endpoints.Name, endpoints.Namespace, endpoints.Subsets[0].Ports[0].Port)
+			hostPort := fmt.Sprintf("%s.%s.svc.cluster.local:%d", endpoints.Name, endpoints.Namespace, endpoints.Subsets[0].Ports[0].Port)
+			conn, err := net.DialTimeout("tcp", hostPort, 10*time.Second)
+			if err != nil {
+				log.Println("artifactory service is still unreachable after timeout. processing skipped")
+				return
+			}
+			defer conn.Close()
+			url := "http://" + hostPort
 			log.Println("found ready artifactory ", url)
 			upsertAccessTokenSecret(url)
 			return
