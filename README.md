@@ -7,8 +7,8 @@ Controller to be deployed in cluster to generate access tokens for artifactory a
 ## Options
 
 ```sh
--artifactoryAdminCredentialsSecret string
-    artifactory admin credentials secret name (default "artifactory-admin-credentials")
+-artifactoryCredentialsSecret string
+    artifactory admin credentials secret name (default "artifactory-credentials")
 -artifactoryNamespace string
     namespace to look for artifactory instance (default "default")
 -artifactoryTokenScope string
@@ -17,6 +17,16 @@ Controller to be deployed in cluster to generate access tokens for artifactory a
     user prefix for artifactory token (default "gitlab-")
 -buildNamespaces value
     comma separated ci build namespaces to monitor (default [build])
+-createDockerRegistrySecret
+    if you want to create a registry credential secret, instead of a normal access-token
+-dockerSecretName string
+    name of the secret containing docker credentials (default "artifactory-docker-credentials")
+-dockerServer string
+    url of the docker server
+-secretKey string
+    key in the secret containing the token (default "artifactory-access-token")
+-secretName string
+    name of the secret (default "artifactory-access-token")
 -help 
     show this help
 ```
