@@ -22,10 +22,15 @@ import (
 )
 
 var artifactoryNamespace string
-var artifactoryAdminCredentialsSecret string
+var artifactoryCredentialsSecret string
 var artifactoryTokenScope string
 var artifactoryTokenUserPrefix string
 var buildNamespaces namespaces = []string{"build"}
+var createDockerRegistrySecret bool
+var dockerSecretName string
+var dockerServer string
+var secretName string
+var secretKey string
 
 type namespaces []string
 
@@ -37,8 +42,6 @@ var clientset *kubernetes.Clientset
 var artifactoryUsername string
 var artifactoryPassword string
 
-const secretName = "artifactory-access-token"
-const secretKey = "artifactory-access-token"
 const tokenEndpoint = "/artifactory/api/security/token"
 const validityEndpoint = "/artifactory/api/repositories"
 
@@ -53,9 +56,14 @@ func (i *namespaces) String() string {
 
 func initFlags() {
 	flag.StringVar(&artifactoryNamespace, "artifactoryNamespace", "default", "namespace to look for artifactory instance")
-	flag.StringVar(&artifactoryAdminCredentialsSecret, "artifactoryAdminCredentialsSecret", "artifactory-admin-credentials", "artifactory admin credentials secret name")
+	flag.StringVar(&artifactoryCredentialsSecret, "artifactoryCredentialsSecret", "artifactory-credentials", "artifactory admin credentials secret name")
 	flag.StringVar(&artifactoryTokenUserPrefix, "artifactoryTokenUserPrefix", "gitlab-", "user prefix for artifactory token")
 	flag.StringVar(&artifactoryTokenScope, "artifactoryTokenScope", "", "comma separated groups for artifactory token")
+	flag.StringVar(&secretName, "secretName", "artifactory-access-token", "name of the secret")
+	flag.StringVar(&secretKey, "secretKey", "artifactory-access-token", "key in the secret containing the token")
+	flag.BoolVar(&createDockerRegistrySecret, "createDockerRegistrySecret", false, "if you want to create a registry credential secret, instead of a normal access-token")
+	flag.StringVar(&dockerSecretName, "dockerSecretName", "artifactory-docker-credentials", "name of the secret containing docker credentials")
+	flag.StringVar(&dockerServer, "dockerServer", "", "url of the docker server")
 	flag.Var(&buildNamespaces, "buildNamespaces", "comma separated ci build namespaces to monitor")
 	flag.Parse()
 }
@@ -112,7 +120,8 @@ func makeTokenRequest(artifactoryURL string, path string, method string, token s
 
 func getNewToken(artifactoryURL string, namespace string) *v1.Secret {
 	data := url.Values{}
-	data.Set("username", artifactoryTokenUserPrefix+namespace)
+	username := artifactoryTokenUserPrefix + namespace
+	data.Set("username", username)
 	data.Set("scope", "member-of-groups:\""+artifactoryTokenScope+"\"")
 	data.Set("expires_in", "0")
 	resp, err := makeTokenRequest(artifactoryURL, tokenEndpoint, "POST", "", strings.NewReader(data.Encode()))
@@ -123,6 +132,22 @@ func getNewToken(artifactoryURL string, namespace string) *v1.Secret {
 	defer resp.Body.Close()
 	tokenResp := createTokenResponse{}
 	json.NewDecoder(resp.Body).Decode(&tokenResp)
+
+	if createDockerRegistrySecret {
+		return &v1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      dockerSecretName,
+				Namespace: namespace,
+			},
+			StringData: map[string]string{
+				".dockerconfigjson": "{\"auths\":{\"" + dockerServer + "\":{\"username\":\"" + username + "\",\"password\":\"" + tokenResp.AccessToken + "\"}}}",
+			},
+		}
+	}
 	return &v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -135,6 +160,7 @@ func getNewToken(artifactoryURL string, namespace string) *v1.Secret {
 		StringData: map[string]string{
 			secretKey: tokenResp.AccessToken,
 		},
+		Type: "kubernetes.io/dockerconfigjson",
 	}
 }
 
@@ -179,7 +205,7 @@ func isTokenValid(artifactoryURL string, namespace string, token string) bool {
 
 func parseArtifactoryAdminCredentials() {
 	//retrieve the secret where artifactory admin credentials are stored
-	credentials, err := clientset.CoreV1().Secrets(artifactoryNamespace).Get(artifactoryAdminCredentialsSecret, metav1.GetOptions{})
+	credentials, err := clientset.CoreV1().Secrets(artifactoryNamespace).Get(artifactoryCredentialsSecret, metav1.GetOptions{})
 
 	if err != nil {
 		panic(err.Error())
@@ -193,20 +219,23 @@ func watchArtifactory() {
 	options := metav1.ListOptions{
 		LabelSelector: "app=artifactory",
 	}
-	watcher, err := clientset.CoreV1().Endpoints(artifactoryNamespace).Watch(options)
-	if err != nil {
-		panic(err.Error())
-	}
-	ch := watcher.ResultChan()
-	for event := range ch {
-		endpoints := event.Object.(*v1.Endpoints)
-		switch event.Type {
-		case watch.Added:
-			handleModified(endpoints)
-		case watch.Deleted:
-			//handleDeleted(endpoints)
-		case watch.Modified:
-			handleModified(endpoints)
+
+	for {
+		watcher, err := clientset.CoreV1().Endpoints(artifactoryNamespace).Watch(options)
+		if err != nil {
+			panic(err.Error())
+		}
+		ch := watcher.ResultChan()
+		for event := range ch {
+			endpoints := event.Object.(*v1.Endpoints)
+			switch event.Type {
+			case watch.Added:
+				handleModified(endpoints)
+			case watch.Deleted:
+				//handleDeleted(endpoints)
+			case watch.Modified:
+				handleModified(endpoints)
+			}
 		}
 	}
 }
