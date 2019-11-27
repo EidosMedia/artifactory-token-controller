@@ -146,6 +146,7 @@ func getNewToken(artifactoryURL string, namespace string) *v1.Secret {
 			StringData: map[string]string{
 				".dockerconfigjson": "{\"auths\":{\"" + dockerServer + "\":{\"username\":\"" + username + "\",\"password\":\"" + tokenResp.AccessToken + "\"}}}",
 			},
+			Type: "kubernetes.io/dockerconfigjson",
 		}
 	}
 	return &v1.Secret{
@@ -160,7 +161,6 @@ func getNewToken(artifactoryURL string, namespace string) *v1.Secret {
 		StringData: map[string]string{
 			secretKey: tokenResp.AccessToken,
 		},
-		Type: "kubernetes.io/dockerconfigjson",
 	}
 }
 
