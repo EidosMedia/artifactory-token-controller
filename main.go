@@ -30,6 +30,7 @@ var createDockerRegistrySecret bool
 var dockerServer string
 var secretName string
 var secretKey string
+var secretUserKey string
 
 type namespaces []string
 
@@ -59,7 +60,8 @@ func initFlags() {
 	flag.StringVar(&artifactoryTokenUserPrefix, "artifactoryTokenUserPrefix", "gitlab-", "user prefix for artifactory token")
 	flag.StringVar(&artifactoryTokenScope, "artifactoryTokenScope", "", "comma separated groups for artifactory token")
 	flag.StringVar(&secretName, "secretName", "artifactory-access-token", "name of the secret containing the token or the docker credentials")
-	flag.StringVar(&secretKey, "secretKey", "artifactory-access-token", "key in the secret containing the token if not docker")
+	flag.StringVar(&secretKey, "secretKey", "artifactory-access-token", "key in the secret containing the token (ignored if createDockerRegistrySecret=true)")
+	flag.StringVar(&secretKey, "secretUserKey", "artifactory-access-token-user", "key in the secret containing the name of the ephemeral user of the token (ignored if createDockerRegistrySecret=true)")
 	flag.BoolVar(&createDockerRegistrySecret, "createDockerRegistrySecret", false, "if you want to create a registry credential secret, instead of a normal access-token")
 	flag.StringVar(&dockerServer, "dockerServer", "", "url of the docker server")
 	flag.Var(&buildNamespaces, "buildNamespaces", "comma separated ci build namespaces to monitor")
@@ -157,7 +159,8 @@ func getNewToken(artifactoryURL string, namespace string) *v1.Secret {
 			Namespace: namespace,
 		},
 		StringData: map[string]string{
-			secretKey: tokenResp.AccessToken,
+			secretKey:     tokenResp.AccessToken,
+			secretUserKey: username,
 		},
 	}
 }

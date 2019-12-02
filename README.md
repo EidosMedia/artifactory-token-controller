@@ -22,9 +22,11 @@ Controller to be deployed in cluster to generate access tokens for artifactory a
 -dockerServer string
     url of the docker server
 -secretKey string
-    key in the secret containing the token if not docker (default "artifactory-access-token")
+    key in the secret containing the token (ignored if createDockerRegistrySecret=true) (default "artifactory-access-token")
 -secretName string
     name of the secret containing the token or the docker credentials (default "artifactory-access-token")
+-secretUserKey string
+    key in the secret containing the name of the ephemeral user of the token (ignored if createDockerRegistrySecret=true) (default "artifactory-access-token-user")
 -help 
     show this help
 ```
