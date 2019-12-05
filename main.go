@@ -61,7 +61,7 @@ func initFlags() {
 	flag.StringVar(&artifactoryTokenScope, "artifactoryTokenScope", "", "comma separated groups for artifactory token")
 	flag.StringVar(&secretName, "secretName", "artifactory-access-token", "name of the secret containing the token or the docker credentials")
 	flag.StringVar(&secretKey, "secretKey", "artifactory-access-token", "key in the secret containing the token (ignored if createDockerRegistrySecret=true)")
-	flag.StringVar(&secretKey, "secretUserKey", "artifactory-access-token-user", "key in the secret containing the name of the ephemeral user of the token (ignored if createDockerRegistrySecret=true)")
+	flag.StringVar(&secretUserKey, "secretUserKey", "artifactory-access-token-user", "key in the secret containing the name of the ephemeral user of the token (ignored if createDockerRegistrySecret=true)")
 	flag.BoolVar(&createDockerRegistrySecret, "createDockerRegistrySecret", false, "if you want to create a registry credential secret, instead of a normal access-token")
 	flag.StringVar(&dockerServer, "dockerServer", "", "url of the docker server")
 	flag.Var(&buildNamespaces, "buildNamespaces", "comma separated ci build namespaces to monitor")
