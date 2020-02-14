@@ -38,6 +38,15 @@ type createTokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
+type dockerConfigJSON struct {
+	Auths map[string]auth
+}
+
+type auth struct {
+	Username string
+	Password string
+}
+
 var clientset *kubernetes.Clientset
 var artifactoryUsername string
 var artifactoryPassword string
@@ -106,9 +115,23 @@ func upsertAccessTokenSecret(artifactoryURL string) {
 			log.Println("unespected error occurred", err)
 			continue
 		} else {
-			updateTokenIfNotValid(artifactoryURL, n, string(current.Data[secretKey]))
+			updateTokenIfNotValid(artifactoryURL, n, getTokenFromSecret(current))
 		}
 	}
+}
+
+func getTokenFromSecret(currentSecret *v1.Secret) string {
+	if createDockerRegistrySecret {
+		return getTokenFromDockerConfigSecret(currentSecret.Data[".dockerconfigjson"])
+	}
+
+	return string(currentSecret.Data[secretKey])
+}
+
+func getTokenFromDockerConfigSecret(content []byte) string {
+	var config dockerConfigJSON
+	json.Unmarshal(content, &config)
+	return config.Auths[dockerServer].Password
 }
 
 func makeTokenRequest(artifactoryURL string, path string, method string, token string, body io.Reader) (*http.Response, error) {
@@ -202,7 +225,7 @@ func isTokenValid(artifactoryURL string, namespace string, token string) bool {
 		return true
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == 401 {
+	if resp.StatusCode != 200 {
 		//token is invalid
 		return false
 	}
