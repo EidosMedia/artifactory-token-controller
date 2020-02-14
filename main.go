@@ -97,7 +97,10 @@ func upsertAccessTokenSecret(artifactoryURL string) {
 			log.Println("create a new artifactory token in build domain=", n)
 			newToken := getNewToken(artifactoryURL, n)
 			if newToken != nil {
-				clientset.CoreV1().Secrets(n).Create(newToken)
+				_, err := clientset.CoreV1().Secrets(n).Create(newToken)
+				if err != nil {
+					log.Println("error creating the token", err)
+				}
 			}
 		} else if err != nil {
 			log.Println("unespected error occurred", err)
@@ -184,7 +187,10 @@ func updateTokenIfNotValid(artifactoryURL string, namespace string, token string
 	newToken := getNewToken(artifactoryURL, namespace)
 	if newToken != nil {
 		//updating invalid secret with new token
-		clientset.CoreV1().Secrets(namespace).Update(newToken)
+		_, err := clientset.CoreV1().Secrets(namespace).Update(newToken)
+		if err != nil {
+			log.Println("error updating the token", err)
+		}
 	}
 }
 
