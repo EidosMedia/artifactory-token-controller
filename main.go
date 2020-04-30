@@ -115,23 +115,33 @@ func upsertAccessTokenSecret(artifactoryURL string) {
 			log.Println("unespected error occurred", err)
 			continue
 		} else {
-			updateTokenIfNotValid(artifactoryURL, n, getTokenFromSecret(current))
+			token, found := getTokenFromSecret(current)
+			updateTokenIfNotValid(artifactoryURL, n, token, found)
 		}
 	}
 }
 
-func getTokenFromSecret(currentSecret *v1.Secret) string {
+func getTokenFromSecret(currentSecret *v1.Secret) (string, bool) {
 	if createDockerRegistrySecret {
-		return getTokenFromDockerConfigSecret(currentSecret.Data[".dockerconfigjson"])
-	}
+		if dockerConfigEntry, found := currentSecret.Data[".dockerconfigjson"]; found {
+			return getTokenFromDockerConfigSecret(dockerConfigEntry)
+		}
+		return "", false
+	}	
 
-	return string(currentSecret.Data[secretKey])
+	if token, found := currentSecret.Data[secretKey]; found {
+		return string(token), true
+	}
+	return "", false
 }
 
-func getTokenFromDockerConfigSecret(content []byte) string {
+func getTokenFromDockerConfigSecret(content []byte) (string, bool) {
 	var config dockerConfigJSON
 	json.Unmarshal(content, &config)
-	return config.Auths[dockerServer].Password
+	if entry, found := config.Auths[dockerServer]; found {
+		return entry.Password, true
+	}
+	return "", false
 }
 
 func makeTokenRequest(artifactoryURL string, path string, method string, token string, body io.Reader) (*http.Response, error) {
@@ -201,8 +211,8 @@ func addAuthorizationHeader(r *http.Request, token string) {
 	}
 }
 
-func updateTokenIfNotValid(artifactoryURL string, namespace string, token string) {
-	if isTokenValid(artifactoryURL, namespace, token) {
+func updateTokenIfNotValid(artifactoryURL string, namespace string, token string, found bool) {
+	if found && isTokenValid(artifactoryURL, namespace, token) {
 		//logging is done in the above method. just returning
 		return
 	}
